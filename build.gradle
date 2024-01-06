@@ -4,18 +4,23 @@ buildscript{
     repositories{
         mavenCentral()
     }
-    
+
     ext{
-        //the build number that this mod is made for
-        mindustryVersion = 'v130'
         kotlinVersion = "1.5.21"
         sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
     }
-    
+
     dependencies{
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+        classpath "org.hjson:hjson:3.1.0"
+        classpath "org.ow2.asm:asm:9.6"
     }
 }
+// set 'mindustryVersion' using 'minGameVersion' from 'mod.hjson'
+def modFile = new File("$projectDir.absolutePath/mod.hjson")
+def modData = org.hjson.JsonValue.readHjson(modFile.newReader()).asObject()
+project.ext.set("modMetadata", modData)
+project.ext.set("mindustryVersion", modData.get("minGameVersion").toString().replace('"', ''))
 
 apply plugin: "kotlin"
 
@@ -23,12 +28,13 @@ sourceSets.main.kotlin.srcDirs = ["src"]
 
 repositories{
     mavenCentral()
+    maven{ url "https://raw.githubusercontent.com/Zelaux/MindustryRepo/master/repository" }
     maven{ url 'https://www.jitpack.io' }
 }
 
 dependencies{
-    compileOnly "com.github.Anuken.Arc:arc-core:$mindustryVersion"
-    compileOnly "com.github.Anuken.Mindustry:core:$mindustryVersion"
+    compileOnly "com.github.Anuken.Arc:arc-core:v$mindustryVersion"
+    compileOnly "com.github.Anuken.Mindustry:core:v$mindustryVersion"
 }
 
 compileKotlin{
@@ -55,7 +61,45 @@ task jarAndroid{
     }
 }
 
+task generateMetadata {
+    dependsOn compileKotlin
+    inputs.files(compileKotlin.outputs.files)
+    outputs.file("${temporaryDir.absolutePath}/mod.hjson")
+    doLast {
+        // search a main mod class
+        final def baseClass = "mindustry/mod/Mod"
+        def mainClass = null
+        for (final def file in inputs.files.asFileTree.collect()) {
+            if(!file.name.endsWith(".class")) continue
+            def cr = new org.objectweb.asm.ClassReader(file.newInputStream())
+            if(!java.lang.reflect.Modifier.isPublic(cr.access)) continue
+            if(cr.superName != baseClass) continue
+            mainClass = cr.className.replace('/', '.')
+        }
+        if(mainClass == null) throw new Exception("There is no public class that extends '$baseClass'")
+        // configure version
+        def modVersion
+        if(System.getenv("CI") == "true") {
+            def commit = System.getenv("GITHUB_SHA")
+            def ref = System.getenv("GITHUB_REF")
+            if(ref.startsWith("refs/tags/")) {
+                modVersion = ref.substring(10)
+            } else {
+                modVersion = "commit-$commit"
+            }
+        } else {
+            modVersion = "local-${java.time.LocalDateTime.now().format("yyyy.MM.dd-HH:mm:ss.SSS")}"
+        }
+        // update and write modMetadata
+        modMetadata.set("version", modVersion)
+        modMetadata.set("main", mainClass)
+        outputs.files.singleFile.text = modMetadata.toString(org.hjson.Stringify.HJSON)
+    }
+}
+
 jar{
+    dependsOn generateMetadata
+    inputs.file(generateMetadata.outputs.files.singleFile)
 	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     archiveFileName = "${project.archivesBaseName}Desktop.jar"
 
@@ -63,9 +107,7 @@ jar{
         configurations.runtimeClasspath.collect{ it.isDirectory() ? it : zipTree(it) }
     }
 
-    from(rootDir){
-        include "mod.hjson"
-    }
+    from(generateMetadata.outputs.files.singleFile.absolutePath)
 
     from("assets/"){
         include "**"
@@ -84,6 +126,36 @@ task deploy(type: Jar){
         delete{
             delete "$buildDir/libs/${project.archivesBaseName}Desktop.jar"
             delete "$buildDir/libs/${project.archivesBaseName}Android.jar"
+        }
+    }
+}
+
+task run{
+    dependsOn jar
+    inputs.file(jar.outputs.files.singleFile)
+    doLast{
+        def dataDirPath = "${temporaryDir.absolutePath}/datadir"
+        def gamePath = "${temporaryDir.absolutePath}/Mindustry-v${mindustryVersion}.jar"
+        def gameUrl = "https://github.com/Anuken/Mindustry/releases/download/v${mindustryVersion}/Mindustry.jar"
+        // copy mod to data directory (and automatically create it)
+        copy {
+            from inputs.files.singleFile
+            into "${dataDirPath}/mods"
+        }
+        // download Mindustry client if it doesn't exist
+        def gameFile = new File(gamePath)
+        if (!gameFile.exists()) {
+            println "Downloading Mindustry v${mindustryVersion} from ${gameUrl} to ${gamePath}"
+            new URL(gameUrl).withInputStream { from ->
+                gameFile.withOutputStream { to ->
+                    to << from
+                }
+            }
+        }
+        // run Mindustry while overriding data directory
+        javaexec {
+            environment("MINDUSTRY_DATA_DIR", dataDirPath)
+            classpath = files(gamePath)
         }
     }
 }
