@@ -102,15 +102,27 @@ task generateMetadata {
         if(mainClass == null) throw new Exception("There is no public class that extends '$baseClass'")
         // configure version
         def modVersion
-        if(System.getenv("CI") == "true") {
+        if(System.getenv("GITHUB_ACTIONS") == "true") {
+            // if built in a GitHub workflow
             def commit = System.getenv("GITHUB_SHA")
             def ref = System.getenv("GITHUB_REF")
+            // when a release is created, a corresponding tag is also created.
+            // Use that tag as a version
             if(ref.startsWith("refs/tags/")) {
                 modVersion = ref.substring(10)
+                // remove some tag prefixes since Mindustry
+                // automatically appends 'v' in mod dialogue
+                if(modVersion.startsWith("ver"))
+                    modVersion = modVersion.substring(3)
+                else if(modVersion.startsWith("v"))
+                    modVersion = modVersion.substring(1)
             } else {
+                // just some push. Use commit hash to specify
+                // that this is a development build
                 modVersion = "commit-$commit"
             }
         } else {
+            // if built locally, use build timestamp as a version (I don't have any better ideas)
             modVersion = "local-${java.time.LocalDateTime.now().format("yyyy.MM.dd-HH:mm:ss.SSS")}"
         }
         // update and write modMetadata
