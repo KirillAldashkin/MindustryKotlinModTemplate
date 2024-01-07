@@ -10,12 +10,12 @@ jobs:
     - name: Set up PATH
       run: |
         echo "${ANDROID_HOME}/build-tools/30.0.1" >> $GITHUB_PATH
-    - name: Set up JDK 16
+    - name: Set up JDK
       uses: actions/setup-java@v4.0.0
       with:
-        java-version: 16    
+        java-version: 17  
         cache: 'gradle'
-        distribution: adopt
+        distribution: temurin
     - name: Build mod jar
       run: ./gradlew --no-daemon deploy
     - name: Upload workflow artifact
