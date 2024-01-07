@@ -16,7 +16,7 @@ jobs:
         java-version: 16
         distribution: adopt
     - name: Build mod jar
-      run: ./gradlew deploy
+      run: ./gradlew --no-daemon deploy
     - name: Upload workflow artifact
       uses: actions/upload-artifact@v4.0.0
       with:
