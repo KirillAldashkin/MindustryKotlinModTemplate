@@ -29,4 +29,3 @@ jobs:
         releaseTag: ${{ github.ref_name }}
         githubToken: ${{ secrets.GITHUB_TOKEN }}
         files: build/libs/${{ github.event.repository.name }}.jar
-        artefactName: ${{ github.event.repository.name }}
