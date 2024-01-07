@@ -24,8 +24,9 @@ jobs:
         path: build/libs/${{ github.event.repository.name }}.jar
     - name: Upload release asset
       if: ${{ github.ref_type == 'tag' }}
-      uses: Shopify/upload-to-release@v2.0.0
+      uses: echapmanFromBunnings/upload-release-assets@1.3
       with:
-        name: ${{ github.event.repository.name }}
-        path: build/libs/${{ github.event.repository.name }}.jar
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        releaseTag: ${{ github.ref_name }}
+        githubToken: ${{ secrets.GITHUB_TOKEN }}
+        files: build/libs/${{ github.event.repository.name }}.jar
+        artefactName: ${{ github.event.repository.name }}
