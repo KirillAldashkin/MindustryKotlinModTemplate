@@ -1,8 +1,9 @@
 ## What I changed:
-1) Added a `gradlew run` command to build mod, download appropriate version of Mindustry client and run it using separate data directory with only this mod.
-2) Removed `mindustryVersion` property from `build.gradle` - now it's inferred from `minGameVersion` property of `mod.hjson` file. *Less places to misconfigure is always good*
-3) Removed `main` property from `mod.hjson` - now `build.gradle` script searches a public class that extends from `mindustry.mod.Mod` and sets `main` property automatically. *You'll never forget to update it anymore*
-4) Removed `version` property from `mod.hjson`. Now it's automatically set to:
+1) Upgraded GitHub workflow to automatically upload `.jar` mod file to releases
+2) Added a `gradlew run` command to build mod, download appropriate version of Mindustry client and run it using separate data directory with only this mod.
+3) Removed `mindustryVersion` property from `build.gradle` - now it's inferred from `minGameVersion` property of `mod.hjson` file. *Less places to misconfigure is always good*
+4) Removed `main` property from `mod.hjson` - now `build.gradle` script searches a public class that extends from `mindustry.mod.Mod` and sets `main` property automatically. *You'll never forget to update it anymore*
+5) Removed `version` property from `mod.hjson`. Now it's automatically set to:
    * `local-%buildtime%`, if built locally
    * `commit-%commithash%`, if built by GitHub Action when pushing
    * `%tagname%`, if built by GitHub Action when new Release is created
