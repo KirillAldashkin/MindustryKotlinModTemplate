@@ -67,13 +67,36 @@ task generateMetadata {
     outputs.file("${temporaryDir.absolutePath}/mod.hjson")
     doLast {
         // search a main mod class
-        final def baseClass = "mindustry/mod/Mod"
+        def baseClass = "mindustry/mod/Mod"
+        def userClasses = inputs.files.asFileTree.collect()
+        // build full inheritance map
+        def classes = (configurations.compileClasspath.asList() + configurations.runtimeClasspath.asList() + userClasses)
+                .stream()
+                .flatMap {(it.name.endsWith(".jar") ? zipTree(it).asList() : [it]).stream() }
+                .filter { it.name.endsWith(".class") }
+        def inheritance = new HashMap<String, String>()
+        for(final def cls in classes) {
+            def cr = new org.objectweb.asm.ClassReader(cls.newInputStream())
+            if((cr.className == null) || ((cr.superName == null))) continue
+            inheritance.put(cr.className, cr.superName)
+        }
+        // check all classes from kotlin compiler
         def mainClass = null
-        for (final def file in inputs.files.asFileTree.collect()) {
+        for (final def file in userClasses) {
             if(!file.name.endsWith(".class")) continue
             def cr = new org.objectweb.asm.ClassReader(file.newInputStream())
             if(!java.lang.reflect.Modifier.isPublic(cr.access)) continue
-            if(cr.superName != baseClass) continue
+            // walk through inheritance tree
+            def name = cr.className
+            def extendsMod = false
+            while(name != null) {
+                if(name == baseClass) {
+                    extendsMod = true
+                    break
+                }
+                name = inheritance.get(name, null)
+            }
+            if(!extendsMod) continue
             mainClass = cr.className.replace('/', '.')
         }
         if(mainClass == null) throw new Exception("There is no public class that extends '$baseClass'")
