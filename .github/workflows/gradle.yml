@@ -1,7 +1,7 @@
 name: Build mod [Desktop+Android]
-
 on: [push]
-
+permissions:
+  contents: write
 jobs:
   buildJar:
     runs-on: ubuntu-latest
